@@ -1,6 +1,6 @@
 # Health Metrics Sync
 
-Sync body composition data from Oxiline scales to Garmin Connect.
+Sync body composition data and blood pressure readings from Oxiline/OMRON devices to Garmin Connect.
 
 ## Quick Start
 
@@ -11,64 +11,89 @@ source .venv/bin/activate  # Linux/Mac
 # .venv\Scripts\activate   # Windows
 
 pip install garminconnect
-python3 oxiline_to_garmin.py "Scale MD Pro.csv"
+python3 oxiline_to_garmin.py "Scale MD Pro.csv"  # Body composition
+python3 oxiline_to_garmin.py "OMRON.csv"  # Blood pressure
 ```
+
+The script auto-detects the CSV type and handles both body composition and blood pressure.
 
 When prompted, type `y` to upload automatically.
 
-## Interactive Upload
+## Optional: Store Credentials
 
-The script will:
-1. Parse your Oxiline CSV
-2. Show sample records
-3. Ask if you want to upload
-4. Prompt for your Garmin credentials
-5. Upload all records automatically
+To avoid entering credentials each time, create a `.creds` file:
+
+```bash
+cat > .creds << EOF
+USERNAME="your@email.com"
+PASSWORD="your_password"
+EOF
+```
+
+The script will automatically use these credentials. **Note**: `.creds` is in `.gitignore` and won't be committed to git.
+
+## Command Line Options
+
+### Skip Duplicate Check (Force Upload)
+
+```bash
+python3 oxiline_to_garmin.py "Scale MD Pro.csv" --force
+```
+
+Uploads all records, including duplicates. Use this if you want to re-upload data that already exists.
+
+## How It Works
+
+1. **Parse CSV** - Reads your Oxiline scale export
+2. **Convert** - Maps Oxiline metrics to Garmin format
+3. **Check Duplicates** - Fetches existing data from Garmin
+4. **Upload** - Only uploads new records (unless `--force`)
+
+### Output Example
 
 ```
-$ python3 oxiline_to_garmin.py
 === Oxiline to Garmin Converter ===
-...
+
+Parsing Scale MD Pro.csv...
+Found 33 measurement sessions
+
+Converted 31 records
+
+=== Sample records ===
+1. 2026-09-13T13:36:56+00:00
+   Weight: 66.52 kg
+   Body Fat: 12.2%
+   Hydration: 64.3%
+   ...
+
 ✓ Saved 31 records to garmin_body_composition.json
 
-==================================================
+============================================================
 Upload to Garmin Connect now? (y/n): y
 
-==================================================
+============================================================
+Using credentials from .creds file
 Garmin email: your@email.com
-Garmin password: ********
 
 === Uploading to Garmin Connect ===
 ✓ Logged in successfully
 
-✓ 2026-09-13T13:36:56 - 66.52kg
-✓ 2026-09-16T10:34:39 - 66.34kg
+Checking for duplicates...
+  Found 24 existing date(s)
+
+⊘ 2026-09-13T13:36:56 - 66.52kg (duplicate)
+✓ 2026-09-15T10:30:00 - 66.30kg
 ...
 
 === Upload Complete ===
-✓ Uploaded: 31
+✓ Uploaded: 7
+⊘ Skipped: 24
 ✗ Failed: 0
 ```
 
-## Manual Upload (if automatic fails)
+## What Gets Uploaded
 
-```bash
-pip install garminconnect
-```
-
-```python
-from garminconnect import Garmin
-import json
-
-garmin = Garmin('your@email.com', 'password')
-garmin.login(tokenstore='.garminconnect')
-
-with open('garmin_body_composition.json') as f:
-    for rec in json.load(f):
-        garmin.add_body_composition(**rec)
-```
-
-## What Gets Uploaded (7 fields)
+### Body Composition (7 fields)
 
 | Oxiline Metric | Garmin Field |
 |---------------|--------------|
@@ -80,13 +105,23 @@ with open('garmin_body_composition.json') as f:
 | Visceral Fat | visceral_fat_rating |
 | BMI | bmi |
 
-## What Doesn't Upload (28 metrics)
+### Blood Pressure (3 fields)
 
-Garmin's API only accepts 7 fields. These Oxiline metrics **cannot** be uploaded:
+| OMRON Metric | Garmin Field |
+|--------------|--------------|
+| Systolic (mmHg) | systolic |
+| Diastolic (mmHg) | diastolic |
+| Pulse (bpm) | pulse (optional) |
+
+## What Doesn't Upload
+
+**Body Composition**: Garmin's API only accepts 7 fields. These Oxiline metrics **cannot** be uploaded:
 - Segmental measurements (arm/leg/trunk fat & muscle)
 - BMR, Physical Age, Obesity Degree
 - Protein %, Skeletal Muscle %, Waist-Hip Ratio
 - And 20+ others
+
+**Blood Pressure**: Notes and symptoms are not uploaded to Garmin.
 
 ## Files
 
@@ -137,9 +172,9 @@ CSV upload only supports **3 fields**:
 
 ## Comparison: API vs CSV Upload
 
-| Method | Fields | Credentials | Speed |
-|--------|--------|-------------|-------|
-| **API** (`oxiline_to_garmin.py`) | 7 fields | Required | ~2 min (with delays) |
-| **CSV** (`create_garmin_csv.py`) | 3 fields | Not needed | Instant |
+| Method | Fields | Credentials | Speed | Duplicates |
+|--------|--------|-------------|-------|------------|
+| **API** (`oxiline_to_garmin.py`) | 7 fields | Required | ~3 sec | Auto-skip |
+| **CSV** (`create_garmin_csv.py`) | 3 fields | Not needed | Instant | Manual |
 
-**Recommendation**: Use API method for complete data transfer.
+**Recommendation**: Use API method for complete data transfer and automatic duplicate detection.

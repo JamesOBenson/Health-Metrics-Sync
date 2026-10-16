@@ -12,14 +12,12 @@ def convert_to_garmin_csv(json_file, output_csv):
     with open(json_file, "r", encoding="utf-8") as f:
         records = json.load(f)
 
-    records.sort(key=lambda x: x.get("date", "") + x.get("time", ""))
+    records.sort(key=lambda x: x.get("timestamp", ""))
 
     rows = []
     for rec in records:
         try:
-            dt = datetime.fromisoformat(
-                rec.get("date", "") + " " + rec.get("time", "")
-            )
+            dt = datetime.fromisoformat(rec.get("timestamp", ""))
             date_str = dt.strftime("%Y-%m-%d")
             time_str = dt.strftime("%H:%M:%S")
         except Exception:
@@ -64,8 +62,8 @@ if __name__ == "__main__":
     try:
         count = convert_to_garmin_csv(json_file, output_csv)
         print(f"✓ Created {output_csv} with {count} records")
-        print(f"\nUpload to: https://connect.garmin.com/modern/import-data")
-        print(f"\nCSV format:")
+        print("\nUpload to: https://connect.garmin.com/modern/import-data")
+        print("\nCSV format:")
         print("  Body")
         print("  weight,bmi,fat,date,time")
 
